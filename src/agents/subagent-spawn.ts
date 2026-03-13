@@ -41,6 +41,8 @@ export const SUBAGENT_SPAWN_MODES = ["run", "session"] as const;
 export type SpawnSubagentMode = (typeof SUBAGENT_SPAWN_MODES)[number];
 export const SUBAGENT_SPAWN_SANDBOX_MODES = ["inherit", "require"] as const;
 export type SpawnSubagentSandboxMode = (typeof SUBAGENT_SPAWN_SANDBOX_MODES)[number];
+export const SUBAGENT_ROLES = ["manager", "backend lead", "frontend lead", "developer", "auditor"] as const;
+export type SubagentRole = (typeof SUBAGENT_ROLES)[number];
 
 export { decodeStrictBase64 };
 
@@ -51,7 +53,7 @@ export type SpawnSubagentParams = {
   model?: string;
   thinking?: string;
   runTimeoutSeconds?: number;
-  role?: string;
+  role?: SubagentRole;
   thread?: boolean;
   mode?: SpawnSubagentMode;
   cleanup?: "delete" | "keep";

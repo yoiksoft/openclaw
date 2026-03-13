@@ -3,7 +3,7 @@ import type { GatewayMessageChannel } from "../../utils/message-channel.js";
 import { ACP_SPAWN_MODES, ACP_SPAWN_STREAM_TARGETS, spawnAcpDirect } from "../acp-spawn.js";
 import { optionalStringEnum } from "../schema/typebox.js";
 import type { SpawnedToolContext } from "../spawned-context.js";
-import { SUBAGENT_SPAWN_MODES, spawnSubagentDirect } from "../subagent-spawn.js";
+import { SUBAGENT_ROLES, SUBAGENT_SPAWN_MODES, spawnSubagentDirect } from "../subagent-spawn.js";
 import type { AnyAgentTool } from "./common.js";
 import { jsonResult, readStringParam, ToolInputError } from "./common.js";
 
@@ -31,7 +31,7 @@ const SessionsSpawnToolSchema = Type.Object({
         'Resume an existing agent session by its ID (e.g. a Codex session UUID from ~/.codex/sessions/). Requires runtime="acp". The agent replays conversation history via session/load instead of starting fresh.',
     }),
   ),
-  role: Type.Optional(Type.String({ description: "Team role for the subagent (e.g. project manager, back-end architect, front-end lead, developer, domain auditor, integration auditor). Shapes the agent\'s system prompt and behavioral constraints." })),
+  role: optionalStringEnum(SUBAGENT_ROLES, { description: "Team role for the subagent (e.g. project manager, back-end architect, front-end lead, developer, domain auditor, integration auditor). Shapes the agent\'s system prompt and behavioral constraints." }),
   model: Type.Optional(Type.String()),
   thinking: Type.Optional(Type.String()),
   cwd: Type.Optional(Type.String()),

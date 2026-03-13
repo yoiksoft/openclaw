@@ -58,6 +58,7 @@ import {
 } from "./subagent-registry-state.js";
 import type { SubagentRunRecord } from "./subagent-registry.types.js";
 import { resolveAgentTimeoutMs } from "./timeout.js";
+import type { SubagentRole } from "./subagent-spawn.js";
 
 export type { SubagentRunRecord } from "./subagent-registry.types.js";
 const log = createSubsystemLogger("agents/subagent-registry");
@@ -1164,7 +1165,7 @@ export function registerSubagentRun(params: {
   requesterOrigin?: DeliveryContext;
   requesterDisplayKey: string;
   task: string;
-  role?: string;
+  role?: SubagentRole;
   cleanup: "delete" | "keep";
   label?: string;
   model?: string;
