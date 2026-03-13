@@ -1164,6 +1164,7 @@ export function registerSubagentRun(params: {
   requesterOrigin?: DeliveryContext;
   requesterDisplayKey: string;
   task: string;
+  role?: string;
   cleanup: "delete" | "keep";
   label?: string;
   model?: string;
@@ -1192,6 +1193,7 @@ export function registerSubagentRun(params: {
     requesterOrigin,
     requesterDisplayKey: params.requesterDisplayKey,
     task: params.task,
+    role: params.role,
     cleanup: params.cleanup,
     expectsCompletionMessage: params.expectsCompletionMessage,
     spawnMode,

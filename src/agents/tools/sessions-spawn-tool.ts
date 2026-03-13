@@ -31,6 +31,7 @@ const SessionsSpawnToolSchema = Type.Object({
         'Resume an existing agent session by its ID (e.g. a Codex session UUID from ~/.codex/sessions/). Requires runtime="acp". The agent replays conversation history via session/load instead of starting fresh.',
     }),
   ),
+  role: Type.Optional(Type.String()),
   model: Type.Optional(Type.String()),
   thinking: Type.Optional(Type.String()),
   cwd: Type.Optional(Type.String()),
@@ -99,6 +100,7 @@ export function createSessionsSpawnTool(
       const requestedAgentId = readStringParam(params, "agentId");
       const resumeSessionId = readStringParam(params, "resumeSessionId");
       const modelOverride = readStringParam(params, "model");
+      const role = readStringParam(params, "role");
       const thinkingOverrideRaw = readStringParam(params, "thinking");
       const cwd = readStringParam(params, "cwd");
       const mode = params.mode === "run" || params.mode === "session" ? params.mode : undefined;
@@ -182,6 +184,7 @@ export function createSessionsSpawnTool(
           thinking: thinkingOverrideRaw,
           runTimeoutSeconds,
           thread,
+          role,
           mode,
           cleanup,
           sandbox,

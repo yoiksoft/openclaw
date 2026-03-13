@@ -706,6 +706,7 @@ export async function spawnSubagentDirect(
       requesterOrigin,
       requesterDisplayKey,
       task,
+      role,
       cleanup,
       label: label || undefined,
       model: resolvedModel,

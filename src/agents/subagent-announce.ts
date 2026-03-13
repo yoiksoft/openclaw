@@ -931,6 +931,9 @@ export function buildSubagentSystemPrompt(params: {
   const canSpawn = childDepth < maxSpawnDepth;
   const parentLabel = childDepth >= 2 ? "parent orchestrator" : "main agent";
 
+  // Subagent team props.
+  const role = params.role
+
   const lines = [
     "# Subagent Context",
     "",
@@ -963,6 +966,14 @@ export function buildSubagentSystemPrompt(params: {
     `- Only use the \`message\` tool when explicitly instructed to contact a specific external recipient; otherwise return plain text and let the ${parentLabel} deliver it`,
     "",
   ];
+
+  if (role) {
+    // TODO: actually build a meaty and useful prompt here.
+    lines.push(
+      "## Your Role",
+      `You are a ${role}`,
+    );
+  }
 
   if (canSpawn) {
     lines.push(
