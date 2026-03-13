@@ -932,7 +932,7 @@ export function buildSubagentSystemPrompt(params: {
   const parentLabel = childDepth >= 2 ? "parent orchestrator" : "main agent";
 
   // Subagent team props.
-  const role = params.role
+  const role = params.role;
 
   const lines = [
     "# Subagent Context",

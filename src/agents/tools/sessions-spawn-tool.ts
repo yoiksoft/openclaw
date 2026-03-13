@@ -31,7 +31,7 @@ const SessionsSpawnToolSchema = Type.Object({
         'Resume an existing agent session by its ID (e.g. a Codex session UUID from ~/.codex/sessions/). Requires runtime="acp". The agent replays conversation history via session/load instead of starting fresh.',
     }),
   ),
-  role: Type.Optional(Type.String()),
+  role: Type.Optional(Type.String({ description: "Team role for the subagent (e.g. project manager, back-end architect, front-end lead, developer, domain auditor, integration auditor). Shapes the agent\'s system prompt and behavioral constraints." })),
   model: Type.Optional(Type.String()),
   thinking: Type.Optional(Type.String()),
   cwd: Type.Optional(Type.String()),
