@@ -51,6 +51,7 @@ export type SpawnSubagentParams = {
   model?: string;
   thinking?: string;
   runTimeoutSeconds?: number;
+  role?: string;
   thread?: boolean;
   mode?: SpawnSubagentMode;
   cleanup?: "delete" | "keep";
@@ -261,6 +262,9 @@ export async function spawnSubagentDirect(
   const task = params.task;
   const label = params.label?.trim() || "";
   const requestedAgentId = params.agentId?.trim();
+
+  // Subagent team configuration.
+  const role = params.role;
 
   // Reject malformed agentId before normalizeAgentId can mangle it.
   // Without this gate, error-message strings like "Agent not found: xyz" pass
@@ -515,6 +519,7 @@ export async function spawnSubagentDirect(
     childSessionKey,
     label: label || undefined,
     task,
+    role,
     acpEnabled: cfg.acp?.enabled !== false && !childRuntime.sandboxed,
     childDepth,
     maxSpawnDepth,

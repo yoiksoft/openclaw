@@ -13,6 +13,7 @@ export type SubagentRunRecord = {
   task: string;
   cleanup: "delete" | "keep";
   label?: string;
+  role?: string;
   model?: string;
   workspaceDir?: string;
   runTimeoutSeconds?: number;
