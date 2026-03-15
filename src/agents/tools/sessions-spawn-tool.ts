@@ -103,7 +103,11 @@ export function createSessionsSpawnTool(
       const requestedAgentId = readStringParam(params, "agentId");
       const resumeSessionId = readStringParam(params, "resumeSessionId");
       const modelOverride = readStringParam(params, "model");
-      const role = readStringParam(params, "role");
+      const roleRaw = readStringParam(params, "role");
+      const role =
+        roleRaw && (SUBAGENT_ROLES as readonly string[]).includes(roleRaw)
+          ? (roleRaw as (typeof SUBAGENT_ROLES)[number])
+          : undefined;
       const thinkingOverrideRaw = readStringParam(params, "thinking");
       const cwd = readStringParam(params, "cwd");
       const mode = params.mode === "run" || params.mode === "session" ? params.mode : undefined;
