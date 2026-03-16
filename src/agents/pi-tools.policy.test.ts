@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import type { OpenClawConfig } from "../config/config.js";
 import {
   filterToolsByPolicy,
@@ -10,6 +10,11 @@ import {
   resolveSubagentToolPolicy,
   resolveSubagentToolPolicyForSession,
 } from "./pi-tools.policy.js";
+import {
+  getToolAllowlistForRole,
+  resetSessionTeamRolesForTests,
+  setSessionTeamRole,
+} from "./subagent-team-role-store.js";
 import { createStubTool } from "./test-helpers/pi-tool-stubs.js";
 
 describe("pi-tools.policy", () => {
@@ -270,5 +275,158 @@ describe("resolveEffectiveToolPolicy", () => {
     } as OpenClawConfig;
     const result = resolveEffectiveToolPolicy({ config: cfg, agentId: "coder" });
     expect(result.profileAlsoAllow).toEqual(["read", "write", "edit"]);
+  });
+});
+
+describe("getToolAllowlistForRole", () => {
+  it("returns an allowlist for project manager", () => {
+    const allowlist = getToolAllowlistForRole("project manager");
+    expect(allowlist).toBeDefined();
+    expect(allowlist!.has("read")).toBe(true);
+    expect(allowlist!.has("sessions_spawn")).toBe(true);
+    expect(allowlist!.has("subagents")).toBe(true);
+    expect(allowlist!.has("memory_search")).toBe(true);
+    expect(allowlist!.has("exec")).toBe(false);
+    expect(allowlist!.has("write")).toBe(false);
+  });
+
+  it("returns an allowlist for developer", () => {
+    const allowlist = getToolAllowlistForRole("developer");
+    expect(allowlist).toBeDefined();
+    expect(allowlist!.has("read")).toBe(true);
+    expect(allowlist!.has("write")).toBe(true);
+    expect(allowlist!.has("exec")).toBe(true);
+    expect(allowlist!.has("sessions_spawn")).toBe(false);
+    expect(allowlist!.has("browser")).toBe(false);
+  });
+
+  it("returns an allowlist for backend lead", () => {
+    const allowlist = getToolAllowlistForRole("backend lead");
+    expect(allowlist).toBeDefined();
+    expect(allowlist!.has("read")).toBe(true);
+    expect(allowlist!.has("grep")).toBe(true);
+    expect(allowlist!.has("write")).toBe(false);
+    expect(allowlist!.has("exec")).toBe(false);
+  });
+
+  it("returns an allowlist for frontend lead", () => {
+    const allowlist = getToolAllowlistForRole("frontend lead");
+    expect(allowlist).toBeDefined();
+    expect(allowlist!.has("read")).toBe(true);
+    expect(allowlist!.has("find")).toBe(true);
+    expect(allowlist!.has("edit")).toBe(false);
+  });
+
+  it("returns an allowlist for domain auditor", () => {
+    const allowlist = getToolAllowlistForRole("domain auditor");
+    expect(allowlist).toBeDefined();
+    expect(allowlist!.has("read")).toBe(true);
+    expect(allowlist!.has("exec")).toBe(true);
+    expect(allowlist!.has("write")).toBe(false);
+  });
+
+  it("returns an allowlist for integration auditor", () => {
+    const allowlist = getToolAllowlistForRole("integration auditor");
+    expect(allowlist).toBeDefined();
+    expect(allowlist!.has("read")).toBe(true);
+    expect(allowlist!.has("exec")).toBe(true);
+    expect(allowlist!.has("write")).toBe(false);
+    expect(allowlist!.has("edit")).toBe(false);
+  });
+
+  it("returns undefined for unknown roles", () => {
+    expect(getToolAllowlistForRole("unknown role")).toBeUndefined();
+  });
+});
+
+describe("resolveSubagentToolPolicyForSession with team roles", () => {
+  const baseCfg = {
+    agents: { defaults: { subagents: { maxSpawnDepth: 2 } } },
+  } as unknown as OpenClawConfig;
+
+  afterEach(() => {
+    resetSessionTeamRolesForTests();
+  });
+
+  it("uses team role allowlist for project manager", () => {
+    const sessionKey = "agent:main:subagent:pm-test";
+    setSessionTeamRole(sessionKey, "project manager");
+    const policy = resolveSubagentToolPolicyForSession(baseCfg, sessionKey);
+    expect(isToolAllowedByPolicyName("read", policy)).toBe(true);
+    expect(isToolAllowedByPolicyName("sessions_spawn", policy)).toBe(true);
+    expect(isToolAllowedByPolicyName("subagents", policy)).toBe(true);
+    expect(isToolAllowedByPolicyName("memory_search", policy)).toBe(true);
+    expect(isToolAllowedByPolicyName("session_status", policy)).toBe(true);
+    // PM should NOT have write/exec/edit
+    expect(isToolAllowedByPolicyName("write", policy)).toBe(false);
+    expect(isToolAllowedByPolicyName("exec", policy)).toBe(false);
+    expect(isToolAllowedByPolicyName("edit", policy)).toBe(false);
+    expect(isToolAllowedByPolicyName("browser", policy)).toBe(false);
+  });
+
+  it("uses team role allowlist for developer", () => {
+    const sessionKey = "agent:main:subagent:dev-test";
+    setSessionTeamRole(sessionKey, "developer");
+    const policy = resolveSubagentToolPolicyForSession(baseCfg, sessionKey);
+    expect(isToolAllowedByPolicyName("read", policy)).toBe(true);
+    expect(isToolAllowedByPolicyName("write", policy)).toBe(true);
+    expect(isToolAllowedByPolicyName("exec", policy)).toBe(true);
+    expect(isToolAllowedByPolicyName("image", policy)).toBe(true);
+    // Developer should NOT have sessions_spawn/subagents
+    expect(isToolAllowedByPolicyName("sessions_spawn", policy)).toBe(false);
+    expect(isToolAllowedByPolicyName("subagents", policy)).toBe(false);
+    expect(isToolAllowedByPolicyName("browser", policy)).toBe(false);
+  });
+
+  it("uses team role allowlist for backend lead", () => {
+    const sessionKey = "agent:main:subagent:be-lead-test";
+    setSessionTeamRole(sessionKey, "backend lead");
+    const policy = resolveSubagentToolPolicyForSession(baseCfg, sessionKey);
+    expect(isToolAllowedByPolicyName("read", policy)).toBe(true);
+    expect(isToolAllowedByPolicyName("grep", policy)).toBe(true);
+    expect(isToolAllowedByPolicyName("find", policy)).toBe(true);
+    expect(isToolAllowedByPolicyName("ls", policy)).toBe(true);
+    // Lead should NOT write/edit/exec
+    expect(isToolAllowedByPolicyName("write", policy)).toBe(false);
+    expect(isToolAllowedByPolicyName("edit", policy)).toBe(false);
+    expect(isToolAllowedByPolicyName("exec", policy)).toBe(false);
+  });
+
+  it("falls back to standard policy when no team role is set", () => {
+    const sessionKey = "agent:main:subagent:no-role-test";
+    // No setSessionTeamRole call
+    const policy = resolveSubagentToolPolicyForSession(baseCfg, sessionKey);
+    // Standard subagent policy denies gateway, cron, etc.
+    expect(isToolAllowedByPolicyName("gateway", policy)).toBe(false);
+    expect(isToolAllowedByPolicyName("cron", policy)).toBe(false);
+    // But allows read/write/exec (non-denied tools)
+    expect(isToolAllowedByPolicyName("read", policy)).toBe(true);
+    expect(isToolAllowedByPolicyName("write", policy)).toBe(true);
+  });
+
+  it("PM role overrides default subagent deny for session_status and memory tools", () => {
+    const sessionKey = "agent:main:subagent:pm-override-test";
+    setSessionTeamRole(sessionKey, "project manager");
+    const policy = resolveSubagentToolPolicyForSession(baseCfg, sessionKey);
+    // These are normally denied for subagents but PM needs them
+    expect(isToolAllowedByPolicyName("session_status", policy)).toBe(true);
+    expect(isToolAllowedByPolicyName("memory_search", policy)).toBe(true);
+    expect(isToolAllowedByPolicyName("memory_get", policy)).toBe(true);
+  });
+
+  it("filters tools correctly with team role allowlist", () => {
+    const sessionKey = "agent:main:subagent:filter-test";
+    setSessionTeamRole(sessionKey, "backend lead");
+    const policy = resolveSubagentToolPolicyForSession(baseCfg, sessionKey);
+    const tools = [
+      createStubTool("read"),
+      createStubTool("write"),
+      createStubTool("exec"),
+      createStubTool("grep"),
+      createStubTool("find"),
+      createStubTool("browser"),
+    ];
+    const filtered = filterToolsByPolicy(tools, policy);
+    expect(filtered.map((t) => t.name).toSorted()).toEqual(["find", "grep", "read"]);
   });
 });
