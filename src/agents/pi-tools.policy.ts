@@ -15,6 +15,7 @@ import {
   resolveStoredSubagentCapabilities,
   type SubagentSessionRole,
 } from "./subagent-capabilities.js";
+import { getSessionTeamRole, getToolAllowlistForRole } from "./subagent-team-role-store.js";
 import { expandToolGroups, normalizeToolName } from "./tool-policy.js";
 
 function makeToolPolicyMatcher(policy: SandboxToolPolicy) {
@@ -123,6 +124,18 @@ export function resolveSubagentToolPolicyForSession(
   cfg: OpenClawConfig | undefined,
   sessionKey: string,
 ): SandboxToolPolicy {
+  // When a team role is set, its allowlist is the single source of truth.
+  // This bypasses the default subagent deny lists (which block tools like
+  // session_status, memory_search that specific roles legitimately need).
+  const teamRole = getSessionTeamRole(sessionKey);
+  if (teamRole) {
+    const roleAllowlist = getToolAllowlistForRole(teamRole);
+    if (roleAllowlist) {
+      return { allow: Array.from(roleAllowlist) };
+    }
+  }
+
+  // No team role or unknown role — fall back to the standard subagent policy.
   const configured = cfg?.tools?.subagents?.tools;
   const capabilities = resolveStoredSubagentCapabilities(sessionKey, { cfg });
   const allow = Array.isArray(configured?.allow) ? configured.allow : undefined;
