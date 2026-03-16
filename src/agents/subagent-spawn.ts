@@ -30,6 +30,7 @@ import {
 import { resolveSubagentCapabilities } from "./subagent-capabilities.js";
 import { getSubagentDepthFromSessionStore } from "./subagent-depth.js";
 import { countActiveRunsForSession, registerSubagentRun } from "./subagent-registry.js";
+import { setSessionTeamRole } from "./subagent-team-role-store.js";
 import { readStringParam } from "./tools/common.js";
 import {
   resolveDisplaySessionKey,
@@ -462,6 +463,11 @@ export async function spawnSubagentDirect(
       error: spawnDepthPatchError,
       childSessionKey,
     };
+  }
+
+  // Register team role for bootstrap file filtering before the agent run starts.
+  if (role) {
+    setSessionTeamRole(childSessionKey, role);
   }
 
   if (resolvedModel) {

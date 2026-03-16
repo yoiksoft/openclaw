@@ -7,6 +7,7 @@ import { resolveRequiredHomeDir } from "../infra/home-dir.js";
 import { runCommandWithTimeout } from "../process/exec.js";
 import { isCronSessionKey, isSubagentSessionKey } from "../routing/session-key.js";
 import { resolveUserPath } from "../utils.js";
+import { getSessionTeamRole } from "./subagent-team-role-store.js";
 import { resolveWorkspaceTemplateDir } from "./workspace-templates.js";
 
 export function resolveDefaultAgentWorkspaceDir(
@@ -548,12 +549,18 @@ const MINIMAL_BOOTSTRAP_ALLOWLIST = new Set([
   DEFAULT_USER_FILENAME,
 ]);
 
+const TEAM_ROLE_BOOTSTRAP_ALLOWLIST = new Set([DEFAULT_TOOLS_FILENAME, DEFAULT_IDENTITY_FILENAME]);
+
 export function filterBootstrapFilesForSession(
   files: WorkspaceBootstrapFile[],
   sessionKey?: string,
 ): WorkspaceBootstrapFile[] {
   if (!sessionKey || (!isSubagentSessionKey(sessionKey) && !isCronSessionKey(sessionKey))) {
     return files;
+  }
+  const teamRole = isSubagentSessionKey(sessionKey) ? getSessionTeamRole(sessionKey) : undefined;
+  if (teamRole) {
+    return files.filter((file) => TEAM_ROLE_BOOTSTRAP_ALLOWLIST.has(file.name));
   }
   return files.filter((file) => MINIMAL_BOOTSTRAP_ALLOWLIST.has(file.name));
 }
