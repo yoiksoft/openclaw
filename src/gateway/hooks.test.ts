@@ -290,6 +290,31 @@ describe("gateway hooks helpers", () => {
     ).toBe("slack:channel:c123");
   });
 
+  test("normalizeAgentPayload preserves dispatch object", () => {
+    const ok = normalizeAgentPayload({
+      message: "hello",
+      dispatch: { branch: "feature/x", registryHit: true },
+    });
+    expect(ok.ok).toBe(true);
+    if (ok.ok) {
+      expect(ok.value.dispatch).toEqual({ branch: "feature/x", registryHit: true });
+    }
+  });
+
+  test("normalizeAgentPayload omits dispatch for non-objects", () => {
+    const withString = normalizeAgentPayload({ message: "hello", dispatch: "bad" });
+    expect(withString.ok && withString.value.dispatch).toBeUndefined();
+
+    const withNull = normalizeAgentPayload({ message: "hello", dispatch: null });
+    expect(withNull.ok && withNull.value.dispatch).toBeUndefined();
+
+    const withArray = normalizeAgentPayload({ message: "hello", dispatch: [1, 2] });
+    expect(withArray.ok && withArray.value.dispatch).toBeUndefined();
+
+    const withNone = normalizeAgentPayload({ message: "hello" });
+    expect(withNone.ok && withNone.value.dispatch).toBeUndefined();
+  });
+
   test("normalizeHookDispatchSessionKey preserves non-target agent scoped keys", () => {
     expect(
       normalizeHookDispatchSessionKey({

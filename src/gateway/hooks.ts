@@ -233,6 +233,8 @@ export type HookAgentPayload = {
   model?: string;
   thinking?: string;
   timeoutSeconds?: number;
+  /** Optional metadata forwarded by the webhook proxy (e.g. branch, registry hits). */
+  dispatch?: Record<string, unknown>;
 };
 
 export type HookAgentDispatchPayload = Omit<HookAgentPayload, "sessionKey"> & {
@@ -415,6 +417,11 @@ export function normalizeAgentPayload(payload: Record<string, unknown>):
     typeof timeoutRaw === "number" && Number.isFinite(timeoutRaw) && timeoutRaw > 0
       ? Math.floor(timeoutRaw)
       : undefined;
+  const dispatchRaw = payload.dispatch;
+  const dispatch =
+    typeof dispatchRaw === "object" && dispatchRaw !== null && !Array.isArray(dispatchRaw)
+      ? (dispatchRaw as Record<string, unknown>)
+      : undefined;
   return {
     ok: true,
     value: {
@@ -430,6 +437,7 @@ export function normalizeAgentPayload(payload: Record<string, unknown>):
       model,
       thinking,
       timeoutSeconds,
+      dispatch,
     },
   };
 }

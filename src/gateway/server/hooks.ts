@@ -1,4 +1,8 @@
 import { randomUUID } from "node:crypto";
+import {
+  initSubagentRegistry,
+  isSubagentSessionRunActive,
+} from "../../agents/subagent-registry.js";
 import type { CliDeps } from "../../cli/deps.js";
 import { loadConfig, type OpenClawConfig } from "../../config/config.js";
 import { resolveMainSessionKeyFromConfig } from "../../config/sessions.js";
@@ -7,6 +11,7 @@ import type { CronJob } from "../../cron/types.js";
 import { requestHeartbeatNow } from "../../infra/heartbeat-wake.js";
 import { enqueueSystemEvent } from "../../infra/system-events.js";
 import type { createSubsystemLogger } from "../../logging/subsystem.js";
+import { isSubagentSessionKey } from "../../routing/session-key.js";
 import {
   normalizeHookDispatchSessionKey,
   type HookAgentDispatchPayload,
@@ -42,11 +47,28 @@ export function createGatewayHooksRequestHandler(params: {
   };
 
   const dispatchAgentHook = (value: HookAgentDispatchPayload) => {
-    const sessionKey = normalizeHookDispatchSessionKey({
+    let sessionKey = normalizeHookDispatchSessionKey({
       sessionKey: value.sessionKey,
       targetAgentId: value.agentId,
     });
     const mainSessionKey = resolveMainSessionKeyFromConfig();
+
+    // Session-aware routing: inject into live subagent sessions directly.
+    if (isSubagentSessionKey(sessionKey)) {
+      initSubagentRegistry();
+      if (isSubagentSessionRunActive(sessionKey)) {
+        const dispatchContext = value.dispatch
+          ? `\n\n[Dispatch metadata: ${JSON.stringify(value.dispatch)}]`
+          : "";
+        const eventText = `[Hook: ${value.name}] ${value.message}${dispatchContext}`;
+        enqueueSystemEvent(eventText, { sessionKey });
+        requestHeartbeatNow({ reason: `hook:${value.name}`, sessionKey });
+        return randomUUID();
+      }
+      // Subagent session is dead — fall back to main session.
+      sessionKey = mainSessionKey;
+    }
+
     const jobId = randomUUID();
     const now = Date.now();
     const job: CronJob = {
