@@ -12,6 +12,7 @@ import { requestHeartbeatNow } from "../../infra/heartbeat-wake.js";
 import { enqueueSystemEvent } from "../../infra/system-events.js";
 import type { createSubsystemLogger } from "../../logging/subsystem.js";
 import { isSubagentSessionKey } from "../../routing/session-key.js";
+import { registerBranch, unregisterBranch } from "../branch-registry.js";
 import {
   normalizeHookDispatchSessionKey,
   type HookAgentDispatchPayload,
@@ -65,7 +66,17 @@ export function createGatewayHooksRequestHandler(params: {
         requestHeartbeatNow({ reason: `hook:${value.name}`, sessionKey });
         return randomUUID();
       }
-      // Subagent session is dead — fall back to main session.
+      // Subagent session is dead — clean up registry entry if a branch was being tracked.
+      const deadBranch =
+        typeof value.dispatch?.branch === "string" ? value.dispatch.branch.trim() : "";
+      if (deadBranch) {
+        try {
+          unregisterBranch(deadBranch);
+        } catch {
+          // best-effort cleanup
+        }
+      }
+      // Fall back to main session.
       sessionKey = mainSessionKey;
     }
 
@@ -108,6 +119,28 @@ export function createGatewayHooksRequestHandler(params: {
           lane: "cron",
           deliveryContract: "shared",
         });
+        // Register branch in the registry when dispatch includes a branch.
+        const spawnBranch =
+          typeof value.dispatch?.branch === "string" ? value.dispatch.branch.trim() : "";
+        if (spawnBranch && result.sessionKey) {
+          try {
+            registerBranch(spawnBranch, {
+              sessionKey: result.sessionKey,
+              prNumber:
+                typeof value.dispatch?.prNumber === "number"
+                  ? Math.floor(value.dispatch.prNumber)
+                  : undefined,
+              repo:
+                typeof value.dispatch?.repo === "string" && value.dispatch.repo.trim()
+                  ? value.dispatch.repo.trim()
+                  : undefined,
+              createdAt: new Date().toISOString(),
+              status: "watching",
+            });
+          } catch {
+            // best-effort registry write
+          }
+        }
         const summary = result.summary?.trim() || result.error?.trim() || result.status;
         const prefix =
           result.status === "ok" ? `Hook ${value.name}` : `Hook ${value.name} (${result.status})`;

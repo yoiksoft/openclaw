@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 // Mock modules before importing the module under test.
+vi.mock("../branch-registry.js", () => ({
+  registerBranch: vi.fn(),
+  unregisterBranch: vi.fn(),
+}));
+
 vi.mock("../../routing/session-key.js", async (importOriginal) => {
   const actual = await importOriginal();
   return {
@@ -51,6 +56,7 @@ import { requestHeartbeatNow } from "../../infra/heartbeat-wake.js";
 import { enqueueSystemEvent } from "../../infra/system-events.js";
 // Import after mocks are set up.
 import { isSubagentSessionKey } from "../../routing/session-key.js";
+import { registerBranch, unregisterBranch } from "../branch-registry.js";
 import type { HookAgentDispatchPayload } from "../hooks.js";
 
 describe("dispatchAgentHook session-aware routing", () => {
@@ -60,6 +66,8 @@ describe("dispatchAgentHook session-aware routing", () => {
   const mockedEnqueueSystemEvent = vi.mocked(enqueueSystemEvent);
   const mockedRequestHeartbeatNow = vi.mocked(requestHeartbeatNow);
   const mockedRunCronIsolatedAgentTurn = vi.mocked(runCronIsolatedAgentTurn);
+  const mockedRegisterBranch = vi.mocked(registerBranch);
+  const mockedUnregisterBranch = vi.mocked(unregisterBranch);
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -215,5 +223,85 @@ describe("dispatchAgentHook session-aware routing", () => {
       sessionKey: string;
     };
     expect(callArgs.sessionKey).toBe("hook:abc123");
+  });
+
+  test("registers branch in registry after isolated turn spawned with branch in dispatch", async () => {
+    mockedIsSubagentSessionKey.mockReturnValue(false);
+    mockedRunCronIsolatedAgentTurn.mockResolvedValueOnce({
+      status: "ok",
+      summary: "done",
+      delivered: true,
+      sessionKey: "hook:abc123:run:xyz",
+    });
+
+    const dispatch = {
+      branch: "feature/ratings-favourites",
+      prNumber: 56,
+      repo: "yoiksoft/yoik.me",
+    };
+    await callDispatchAgentHook({ ...basePayload, sessionKey: "hook:abc123", dispatch });
+
+    expect(mockedRegisterBranch).toHaveBeenCalledWith("feature/ratings-favourites", {
+      sessionKey: "hook:abc123:run:xyz",
+      prNumber: 56,
+      repo: "yoiksoft/yoik.me",
+      createdAt: expect.any(String),
+      status: "watching",
+    });
+  });
+
+  test("does not register branch when result has no sessionKey", async () => {
+    mockedIsSubagentSessionKey.mockReturnValue(false);
+    // Default mock returns no sessionKey.
+
+    const dispatch = { branch: "feature/ratings-favourites" };
+    await callDispatchAgentHook({ ...basePayload, dispatch });
+
+    expect(mockedRegisterBranch).not.toHaveBeenCalled();
+  });
+
+  test("does not register branch when dispatch has no branch", async () => {
+    mockedIsSubagentSessionKey.mockReturnValue(false);
+    mockedRunCronIsolatedAgentTurn.mockResolvedValueOnce({
+      status: "ok",
+      summary: "done",
+      delivered: true,
+      sessionKey: "hook:abc123:run:xyz",
+    });
+
+    await callDispatchAgentHook({ ...basePayload, sessionKey: "hook:abc123" });
+
+    expect(mockedRegisterBranch).not.toHaveBeenCalled();
+  });
+
+  test("unregisters branch from registry when dead session has branch in dispatch", async () => {
+    mockedIsSubagentSessionKey.mockReturnValue(true);
+    mockedIsSubagentSessionRunActive.mockReturnValue(false);
+
+    const dispatch = { branch: "feature/ratings", prNumber: 42, repo: "yoiksoft/yoik.me" };
+    await callDispatchAgentHook({ ...basePayload, dispatch });
+
+    expect(mockedUnregisterBranch).toHaveBeenCalledWith("feature/ratings");
+  });
+
+  test("does not call unregisterBranch when dead session has no branch in dispatch", async () => {
+    mockedIsSubagentSessionKey.mockReturnValue(true);
+    mockedIsSubagentSessionRunActive.mockReturnValue(false);
+
+    // basePayload has no dispatch field.
+    await callDispatchAgentHook(basePayload);
+
+    expect(mockedUnregisterBranch).not.toHaveBeenCalled();
+  });
+
+  test("does not touch registry when alive subagent handles hook directly", async () => {
+    mockedIsSubagentSessionKey.mockReturnValue(true);
+    mockedIsSubagentSessionRunActive.mockReturnValue(true);
+
+    const dispatch = { branch: "feature/ratings", prNumber: 42 };
+    await callDispatchAgentHook({ ...basePayload, dispatch });
+
+    expect(mockedRegisterBranch).not.toHaveBeenCalled();
+    expect(mockedUnregisterBranch).not.toHaveBeenCalled();
   });
 });
